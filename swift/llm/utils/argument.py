@@ -44,7 +44,7 @@ def is_adapter(sft_type: str) -> bool:
 
 
 class ArgumentsBase:
-
+    quant_bits: Literal[0, 1, 2, 3, 4, 8] = 0
     def _load_json_or_path(self, key) -> None:
         value = getattr(self, key)
         if isinstance(value, str):
@@ -178,12 +178,12 @@ class ArgumentsBase:
         assert torch_dtype in {torch.float16, torch.bfloat16, torch.float32}
         if torch_dtype == torch.float16:
             if isinstance(self, SftArguments) and self.sft_type == 'full':
-                self.dtype = 'fp32'
-                torch_dtype = torch.float32
-                logger.warning(
-                    'Fine-tuning with full parameters does not support fp16, and is prone to NaN. '
-                    'We will use the fp32 & AMP approach, which consumes approximately twice the memory of bf16.')
-                logger.info(f'Setting torch_dtype: {torch_dtype}')
+                self.dtype = 'fp16'
+                torch_dtype = torch.float16
+                # logger.warning(
+                #     'Fine-tuning with full parameters does not support fp16, and is prone to NaN. '
+                #     'We will use the fp32 & AMP approach, which consumes approximately twice the memory of bf16.')
+                # logger.info(f'Setting torch_dtype: {torch_dtype}')
             fp16, bf16 = True, False
         elif torch_dtype == torch.bfloat16:
             support_bf16 = is_torch_bf16_gpu_available()
@@ -203,7 +203,8 @@ class ArgumentsBase:
             assert bnb_4bit_compute_dtype in {torch.float16, torch.bfloat16, torch.float32}
         else:
             bnb_4bit_compute_dtype = None
-        quantization_bit = self.quantization_bit
+        quantization_bit = self.quantization_bit = self.quant_bits 
+        #quantization_bit = self.quantization_bit
         if self.quant_method == 'bnb':
             if quantization_bit == 4:
                 require_version('bitsandbytes')
@@ -1056,8 +1057,8 @@ class SftArguments(ArgumentsBase):
                     self.freeze_parameters += mllm_arch.generator
             assert 0 <= self.freeze_parameters_ratio <= 1
             assert self.quantization_bit == 0, 'Full parameter fine-tuning does not support quantization.'
-            assert self.dtype != 'fp16', ("Fine-tuning with dtype=='fp16' can lead to NaN issues. "
-                                          'Please use fp32+AMP or bf16 to perform full parameter fine-tuning.')
+            # assert self.dtype != 'fp16', ("Fine-tuning with dtype=='fp16' can lead to NaN issues. "
+            #                               'Please use fp32+AMP or bf16 to perform full parameter fine-tuning.')
             if isinstance(self.additional_trainable_parameters, str):
                 self.additional_trainable_parameters = [self.additional_trainable_parameters]
             if self.learning_rate is None:
